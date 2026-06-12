@@ -8,9 +8,9 @@ terraform {
   required_version = ">= 1.3.0"
 
   backend "s3" {
-    bucket         = "utkarsh-tfstate-aws-playground"
-    key            = "aws-playground/terraform.tfstate"
-    region         = "ap-south-1"
+    bucket       = "utkarsh-tfstate-aws-playground"
+    key          = "aws-playground/terraform.tfstate"
+    region       = "ap-south-1"
     use_lockfile = true
     encrypt      = true
   }
