@@ -39,6 +39,8 @@ server {
 NGXEOF
 
 rm -f /etc/nginx/conf.d/default.conf
+# Remove default server block from nginx.conf to avoid port 80 conflict
+sed -i '/^    server {/,/^    }/d' /etc/nginx/nginx.conf
 chown -R ec2-user:ec2-user /opt/blog
 
 systemctl daemon-reload
