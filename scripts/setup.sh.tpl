@@ -39,8 +39,25 @@ server {
 NGXEOF
 
 rm -f /etc/nginx/conf.d/default.conf
-# Remove default server block from nginx.conf to avoid port 80 conflict
-sed -i '/^    server {/,/^    }/d' /etc/nginx/nginx.conf
+
+cat > /etc/nginx/nginx.conf << 'NGINXEOF'
+user nginx;
+worker_processes auto;
+error_log /var/log/nginx/error.log;
+pid /run/nginx.pid;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+    sendfile      on;
+    keepalive_timeout 65;
+    include /etc/nginx/conf.d/*.conf;
+}
+NGINXEOF
 chown -R ec2-user:ec2-user /opt/blog
 
 systemctl daemon-reload
