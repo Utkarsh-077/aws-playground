@@ -66,10 +66,7 @@ resource "aws_instance" "this" {
   vpc_security_group_ids = [aws_security_group.web.id]
 
   user_data_replace_on_change = true
-  user_data = templatefile("scripts/setup.sh.tpl", {
-    app_content  = file("app/app.py")
-    requirements = file("app/requirements.txt")
-  })
+  user_data                   = file("scripts/setup.sh.tpl")
 
   tags = {
     Name = "smallest-ec2-utkarsh"
