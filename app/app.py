@@ -1,26 +1,37 @@
 from flask import Flask, render_template_string, request, redirect, url_for
-import sqlite3
+import psycopg2
+import psycopg2.extras
 import os
 
 app = Flask(__name__)
-DB = os.environ.get('DB_PATH', '/opt/blog/blog.db')
 
 def get_db():
-    conn = sqlite3.connect(DB)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return psycopg2.connect(
+        host=os.environ.get('DB_HOST'),
+        dbname=os.environ.get('DB_NAME', 'blogdb'),
+        user=os.environ.get('DB_USER', 'bloguser'),
+        password=os.environ.get('DB_PASSWORD'),
+        connect_timeout=5
+    )
 
 def init_db():
-    with get_db() as conn:
-        conn.execute('''CREATE TABLE IF NOT EXISTS posts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            content TEXT NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )''')
-        conn.execute("INSERT OR IGNORE INTO posts (id, title, content) VALUES (1, 'WELCOME TO SUPER BLOG BROS!', 'Thank you for playing Super Blog Bros! Your quest for knowledge begins here. Collect posts like coins, defeat writer-s-block like a boss, and save the princess of creativity!')")
-        conn.execute("INSERT OR IGNORE INTO posts (id, title, content) VALUES (2, 'WORLD 1-1: THE CLOUD', 'Deployed on AWS EC2 using Terraform. Every terraform apply is like hitting a question block - you never know what resource pops out. Game Over? Just run terraform destroy!')")
-        conn.commit()
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute('''CREATE TABLE IF NOT EXISTS posts (
+        id SERIAL PRIMARY KEY,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    cur.execute("""
+        INSERT INTO posts (id, title, content) VALUES
+        (1, 'WELCOME TO SUPER BLOG BROS!', 'Thank you for playing Super Blog Bros! Your quest for knowledge begins here. Collect posts like coins, defeat writer-s-block like a boss, and save the princess of creativity!'),
+        (2, 'WORLD 1-1: THE CLOUD', 'Deployed on AWS EC2 using Terraform. Every terraform apply is like hitting a question block - you never know what resource pops out. Game Over? Just run terraform destroy!')
+        ON CONFLICT (id) DO NOTHING
+    """)
+    conn.commit()
+    cur.close()
+    conn.close()
 
 BASE = """<!DOCTYPE html>
 <html lang="en">
@@ -625,14 +636,22 @@ EDIT = BASE.replace("{% block title %}SUPER BLOG BROS{% endblock %}", "EDIT POST
 
 @app.route('/')
 def index():
-    with get_db() as conn:
-        posts = conn.execute('SELECT * FROM posts ORDER BY created_at DESC').fetchall()
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute('SELECT * FROM posts ORDER BY created_at DESC')
+    posts = cur.fetchall()
+    cur.close()
+    conn.close()
     return render_template_string(INDEX, posts=posts)
 
 @app.route('/post/<int:post_id>')
 def post(post_id):
-    with get_db() as conn:
-        p = conn.execute('SELECT * FROM posts WHERE id = ?', (post_id,)).fetchone()
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute('SELECT * FROM posts WHERE id = %s', (post_id,))
+    p = cur.fetchone()
+    cur.close()
+    conn.close()
     if not p:
         return 'Post not found', 404
     return render_template_string(POST, p=p)
@@ -640,32 +659,45 @@ def post(post_id):
 @app.route('/new', methods=['GET', 'POST'])
 def new_post():
     if request.method == 'POST':
-        with get_db() as conn:
-            conn.execute('INSERT INTO posts (title, content) VALUES (?, ?)',
-                         (request.form['title'], request.form['content']))
-            conn.commit()
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute('INSERT INTO posts (title, content) VALUES (%s, %s)',
+                    (request.form['title'], request.form['content']))
+        conn.commit()
+        cur.close()
+        conn.close()
         return redirect(url_for('index'))
     return render_template_string(NEW)
 
 @app.route('/edit/<int:post_id>', methods=['GET', 'POST'])
 def edit_post(post_id):
-    with get_db() as conn:
-        p = conn.execute('SELECT * FROM posts WHERE id = ?', (post_id,)).fetchone()
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute('SELECT * FROM posts WHERE id = %s', (post_id,))
+    p = cur.fetchone()
+    cur.close()
+    conn.close()
     if not p:
         return 'Post not found', 404
     if request.method == 'POST':
-        with get_db() as conn:
-            conn.execute('UPDATE posts SET title = ?, content = ? WHERE id = ?',
-                         (request.form['title'], request.form['content'], post_id))
-            conn.commit()
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute('UPDATE posts SET title = %s, content = %s WHERE id = %s',
+                    (request.form['title'], request.form['content'], post_id))
+        conn.commit()
+        cur.close()
+        conn.close()
         return redirect(url_for('post', post_id=post_id))
     return render_template_string(EDIT, p=p)
 
 @app.route('/delete/<int:post_id>', methods=['POST'])
 def delete_post(post_id):
-    with get_db() as conn:
-        conn.execute('DELETE FROM posts WHERE id = ?', (post_id,))
-        conn.commit()
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute('DELETE FROM posts WHERE id = %s', (post_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
     return redirect(url_for('index'))
 
 init_db()

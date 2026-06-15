@@ -35,6 +35,8 @@ jobs:
       - name: Terraform Plan
         id: plan
         run: terraform plan -no-color 2>&1 | tee plan_output.txt
+        env:
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
 
       - name: Post Plan on PR
         if: github.event_name == 'pull_request'
@@ -73,3 +75,5 @@ jobs:
 
       - name: Terraform Apply
         run: terraform apply -auto-approve -no-color
+        env:
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
