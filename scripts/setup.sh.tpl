@@ -43,8 +43,10 @@ rm -f /etc/nginx/conf.d/default.conf
 cat > /etc/nginx/nginx.conf << 'NGINXEOF'
 user nginx;
 worker_processes auto;
-error_log /var/log/nginx/error.log;
+error_log /var/log/nginx/error.log notice;
 pid /run/nginx.pid;
+
+include /usr/share/nginx/modules/*.conf;
 
 events {
     worker_connections 1024;
