@@ -1,4 +1,5 @@
 #!/bin/bash
+# v2 — prometheus metrics
 set -e
 
 yum install -y docker
