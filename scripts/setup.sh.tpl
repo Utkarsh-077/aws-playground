@@ -1,24 +1,32 @@
 #!/bin/bash
 set -e
 
-yum install -y python3 python3-pip git
-git clone https://github.com/Utkarsh-077/aws-playground.git /opt/blog
-pip3 install -r /opt/blog/app/requirements.txt
+yum install -y docker
+systemctl start docker
+systemctl enable docker
+
+aws ecr get-login-password --region ${region} | \
+  docker login --username AWS --password-stdin ${ecr_url}
+
+docker pull ${ecr_url}:latest
 
 cat > /etc/systemd/system/blog.service << 'SVCEOF'
 [Unit]
 Description=Flask Blog
-After=network.target
+After=docker.service
+Requires=docker.service
 
 [Service]
-User=root
-WorkingDirectory=/opt/blog/app
-Environment="DB_HOST=${db_host}"
-Environment="DB_NAME=${db_name}"
-Environment="DB_USER=${db_user}"
-Environment="DB_PASSWORD=${db_password}"
-ExecStart=/usr/local/bin/gunicorn -w 2 -b 0.0.0.0:80 app:app
 Restart=always
+ExecStartPre=-/usr/bin/docker stop blog
+ExecStartPre=-/usr/bin/docker rm blog
+ExecStart=/usr/bin/docker run --name blog \
+  -p 80:80 \
+  -e DB_HOST=${db_host} \
+  -e DB_NAME=${db_name} \
+  -e DB_USER=${db_user} \
+  -e DB_PASSWORD=${db_password} \
+  ${ecr_url}:latest
 
 [Install]
 WantedBy=multi-user.target

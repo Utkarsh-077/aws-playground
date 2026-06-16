@@ -1,0 +1,25 @@
+services:
+  app:
+    build: ./app
+    ports:
+      - "5000:80"
+    environment:
+      DB_HOST: db
+      DB_NAME: blogdb
+      DB_USER: bloguser
+      DB_PASSWORD: blogpass
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: blogdb
+      POSTGRES_USER: bloguser
+      POSTGRES_PASSWORD: blogpass
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bloguser -d blogdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5

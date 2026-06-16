@@ -52,8 +52,8 @@ jobs:
               body: `### Terraform Plan\n\`\`\`\n${plan}\n\`\`\``
             });
 
-  apply:
-    name: Apply
+  build-and-deploy:
+    name: Build & Deploy
     runs-on: ubuntu-latest
     needs: plan
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -61,14 +61,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: hashicorp/setup-terraform@v3
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
+
+      - name: Build and push Docker image to ECR
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          ECR_URL="$ACCOUNT_ID.dkr.ecr.ap-south-1.amazonaws.com/super-blog-bros"
+          aws ecr get-login-password --region ap-south-1 | \
+            docker login --username AWS --password-stdin $ECR_URL
+          docker build -t $ECR_URL:latest ./app
+          docker push $ECR_URL:latest
+
+      - uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
         run: terraform init

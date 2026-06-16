@@ -17,21 +17,25 @@ def get_db():
 def init_db():
     conn = get_db()
     cur = conn.cursor()
-    cur.execute('''CREATE TABLE IF NOT EXISTS posts (
-        id SERIAL PRIMARY KEY,
-        title TEXT NOT NULL,
-        content TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )''')
-    cur.execute("""
-        INSERT INTO posts (id, title, content) VALUES
-        (1, 'WELCOME TO SUPER BLOG BROS!', 'Thank you for playing Super Blog Bros! Your quest for knowledge begins here. Collect posts like coins, defeat writer-s-block like a boss, and save the princess of creativity!'),
-        (2, 'WORLD 1-1: THE CLOUD', 'Deployed on AWS EC2 using Terraform. Every terraform apply is like hitting a question block - you never know what resource pops out. Game Over? Just run terraform destroy!')
-        ON CONFLICT (id) DO NOTHING
-    """)
-    conn.commit()
-    cur.close()
-    conn.close()
+    try:
+        cur.execute('''CREATE TABLE IF NOT EXISTS posts (
+            id SERIAL PRIMARY KEY,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )''')
+        cur.execute('SELECT COUNT(*) FROM posts')
+        if cur.fetchone()[0] == 0:
+            cur.execute("INSERT INTO posts (title, content) VALUES (%s, %s)",
+                        ('WELCOME TO SUPER BLOG BROS!', 'Thank you for playing Super Blog Bros! Your quest for knowledge begins here. Collect posts like coins, defeat writer-s-block like a boss, and save the princess of creativity!'))
+            cur.execute("INSERT INTO posts (title, content) VALUES (%s, %s)",
+                        ('WORLD 1-1: THE CLOUD', 'Deployed on AWS EC2 using Terraform. Every terraform apply is like hitting a question block - you never know what resource pops out. Game Over? Just run terraform destroy!'))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+    finally:
+        cur.close()
+        conn.close()
 
 BASE = """<!DOCTYPE html>
 <html lang="en">

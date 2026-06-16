@@ -47,6 +47,10 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
+data "aws_ecr_repository" "blog" {
+  name = "super-blog-bros"
+}
+
 data "aws_vpc" "default" {
   default = true
 }
@@ -56,6 +60,29 @@ data "aws_subnets" "default" {
     name   = "vpc-id"
     values = [data.aws_vpc.default.id]
   }
+}
+
+# IAM role for EC2 to pull from ECR
+resource "aws_iam_role" "ec2" {
+  name = "blog-ec2-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "ec2.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ecr" {
+  role       = aws_iam_role.ec2.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
+resource "aws_iam_instance_profile" "ec2" {
+  name = "blog-ec2-profile"
+  role = aws_iam_role.ec2.name
 }
 
 # EC2 security group
@@ -128,6 +155,7 @@ resource "aws_instance" "this" {
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = "t3.micro"
   vpc_security_group_ids = [aws_security_group.web.id]
+  iam_instance_profile   = aws_iam_instance_profile.ec2.name
 
   user_data_replace_on_change = true
   user_data = templatefile("scripts/setup.sh.tpl", {
@@ -135,6 +163,8 @@ resource "aws_instance" "this" {
     db_name     = aws_db_instance.blog.db_name
     db_user     = aws_db_instance.blog.username
     db_password = var.db_password
+    ecr_url     = data.aws_ecr_repository.blog.repository_url
+    region      = var.region
   })
 
   tags = {
